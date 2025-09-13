@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs'); 
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { protect } = require('../middleware/auth');
@@ -7,7 +8,7 @@ const { protect } = require('../middleware/auth');
 router.post('/register', async (req, res, next) => {
   try {
     const { email, password, first_name, last_name, phone } = req.body;
-    const role = 'employee'; // Restrict to employee
+    const role = 'employee'; 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'Email already exists' });
@@ -34,14 +35,23 @@ router.post('/login', async (req, res, next) => {
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    
+    const token = jwt.sign(
+      { id: user._id, role: user.role }, 
+      process.env.JWT_SECRET, 
+      { expiresIn: '1d' }
+    );
+    
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'none',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 24 * 60 * 60 * 1000, 
     });
+    
     res.json({
       message: 'Logged in',
+      token: token, 
       user: {
         id: user._id,
         email: user.email,
@@ -60,7 +70,7 @@ router.post('/logout', (req, res) => {
   res.clearCookie('token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   });
   res.json({ message: 'Logged out' });
 });
